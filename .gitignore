@@ -1,0 +1,10 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+/_data
+/_old
+test_script.R
+GV_2025_list_v20250331-v1.csv
+GVTreeMon_BreakDetectors-v1.R
+GVTreeMon_RunBreakDetectors-v1.R
