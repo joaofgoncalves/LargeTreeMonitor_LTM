@@ -160,8 +160,9 @@ ltm_copy_ts <- function(ts_to_copy, values){
 
 
 ltm_summarize_break_df <- function(break_df) {
+  
   if (nrow(break_df) == 0 || !any(break_df$has_valid_breaks)) {
-    return("No valid breaks were detected.")
+    return("🟢 No valid breaks were detected.")
   }
   
   df_valid <- subset(break_df, has_valid_breaks == TRUE & !is.na(break_date))
@@ -173,12 +174,12 @@ ltm_summarize_break_df <- function(break_df) {
       break_date = min(break_date),
       #last_break = max(break_date),
       avg_magnitude = round(mean(break_magn, na.rm = TRUE), 2),
-      .groups = "drop"
+      .groups = "drop" 
     )
   
   # Format into a human-readable summary string
   summary_text <- paste0(
-    "Break Detection Summary:\n",
+    "🔴 Break detection summary:\n",
     "-------------------------\n",
     paste(
       apply(summary_list, 1, function(row) {
@@ -198,3 +199,31 @@ ltm_summarize_break_df <- function(break_df) {
 }
 
 Percentile90 <- function(x) quantile(x,probs=0.9,na.rm=TRUE)
+
+
+ltm_loc_file <- file.path("ltm_cache", "current_location.txt")
+
+ltm_read_location <- function() {
+  # Check if the file exists
+  if (!file.exists(ltm_loc_file)) {
+    return(NULL)
+  }
+  # read the single line
+  loc_str <- readLines(ltm_loc_file, warn = FALSE)
+  if (length(loc_str) > 0) {
+    return(loc_str[1])
+  } else {
+    return(NULL)
+  }
+}
+
+ltm_store_location <- function(lat, lon) {
+  # Ensure the directory exists
+  if (!dir.exists("ltm_cache")) dir.create("ltm_cache", recursive = TRUE)
+  
+  # Round or format to avoid floating point artifacts
+  loc_str <- paste(round(lat, 6), round(lon, 6), sep = ",")
+  
+  writeLines(loc_str, con = ltm_loc_file)
+}
+
