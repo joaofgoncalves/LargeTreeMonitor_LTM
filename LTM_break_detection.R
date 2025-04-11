@@ -1,4 +1,6 @@
 
+
+
 # Print method for ts_breaks_run class
 print.ts_breaks_run <- function(x, ...) {
   cat("Break detection run summary:\n")
@@ -49,10 +51,10 @@ ltm_cpm_detect_breaks <- function(spidf,
   
   stopifnot(inherits(spidf, "spidf"))
   
-  valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
+  #valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
   
-  if (!(ts_name %in% valid_data_types)) {
-    stop("Invalid ts_name! Must be one of: ", paste(valid_data_types, collapse = ", "))
+  if (!(ts_name %in% VALID_DATA_TYPES)) {
+    stop("Invalid ts_name! Must be one of: ", paste(VALID_DATA_TYPES, collapse = ", "))
   }
   
   
@@ -178,10 +180,10 @@ ltm_bfast01_detect_breaks <- function(
   
   stopifnot(inherits(spidf, "spidf"))
   
-  valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
+  #valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
   
-  if (!(ts_name %in% valid_data_types)) {
-    stop("Invalid ts_name! Must be one of: ", paste(valid_data_types, collapse = ", "))
+  if (!(ts_name %in% VALID_DATA_TYPES)) {
+    stop("Invalid ts_name! Must be one of: ", paste(VALID_DATA_TYPES, collapse = ", "))
   }
   
   
@@ -200,9 +202,11 @@ ltm_bfast01_detect_breaks <- function(
     order = order, ...)
   
   
-  break_date <- breakdates(bf01)
+  #break_date <- breakdates(bf01)
+  brk <- bf01$breakpoints
   
-  if(is.na(break_date)){
+  
+  if(is.na(brk)){
     
     out <- list(method="bfast01",
                 data_type = ts_name,
@@ -300,10 +304,10 @@ ltm_ed_detect_breaks <- function(spidf,
   
   stopifnot(inherits(spidf, "spidf"))
   
-  valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
+  #valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
   
-  if (!(ts_name %in% valid_data_types)) {
-    stop("Invalid ts_name! Must be one of: ", paste(valid_data_types, collapse = ", "))
+  if (!(ts_name %in% VALID_DATA_TYPES)) {
+    stop("Invalid ts_name! Must be one of: ", paste(VALID_DATA_TYPES, collapse = ", "))
   }
   
   yts <- ltm_spidf_to_ts(spidf, ts_name)
@@ -487,10 +491,10 @@ ltm_mcp_detect_breaks <- function(spidf,
   
   stopifnot(inherits(spidf, "spidf"))
   
-  valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
+  #valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
   
-  if (!(ts_name %in% valid_data_types)) {
-    stop("Invalid ts_name! Must be one of: ", paste(valid_data_types, collapse = ", "))
+  if (!(ts_name %in% VALID_DATA_TYPES)) {
+    stop("Invalid ts_name! Must be one of: ", paste(VALID_DATA_TYPES, collapse = ", "))
   }
   
   # Prepare the time series data to fit the model
@@ -608,6 +612,242 @@ ltm_mcp_detect_breaks <- function(spidf,
   }
 }
 
+
+ltm_strucchange_detect_breaks <- function(
+    spidf,
+    ts_name = "spi",
+    season_adj = TRUE,
+    s_window   = 30,
+    h          = 0.15,
+    breaks     = 1,
+    thresh_date,
+    thresh_change = -10,
+    tresh_int     = NULL,
+    thresh_fun    = median,
+    ...
+) {
+  # 1) Basic sanity checks
+  
+  stopifnot(inherits(spidf, "spidf"))
+  
+  #valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
+  
+  if (!(ts_name %in% VALID_DATA_TYPES)) {
+    stop("Invalid ts_name! Must be one of: ", paste(VALID_DATA_TYPES, collapse = ", "))
+  }
+  
+  # 2) Convert spidf to a time-series object and get the date vector
+  yts <- ltm_spidf_to_ts(spidf, ts_name)
+  dts <- ltm_get_dates(spidf, remove_leap = TRUE)
+  
+  # 3) (Optional) Seasonal adjustment via STL
+  if (season_adj) {
+    decomp <- stl(yts, s.window = s_window)
+    ysa <- seasadj(decomp)
+  } else {
+    ysa <- yts
+  }
+  
+  # 4) Use breakpoints from 'strucchange' to detect structural breaks
+  #    We'll fit a simple intercept-only model y ~ 1.
+  bp <- strucchangeRcpp::breakpoints(ysa ~ 1,
+                                 h = h,
+                                 breaks = breaks,
+                                 ...)
+  
+  # 5) Determine if a break was found
+  #    If the best model is 'breaks = 0', we typically get NA in bp$breakpoints.
+  if (all(is.na(bp$breakpoints))) {
+    # No break found
+    out <- list(
+      method           = "stc",
+      data_type        = ts_name,
+      has_breaks       = FALSE,
+      has_valid_breaks = FALSE,
+      break_magn       = NA,
+      breaks_indices   = NA,
+      breaks_dates     = NA,
+      output_object    = bp,
+      season_adj       = season_adj,
+      call             = match.call()
+    )
+    class(out) <- "ts_breaks_run"
+    return(out)
+  }
+  
+  # 6) For simplicity, we only consider the first break if multiple found
+  #    If you allow multiple breaks, you can adapt the logic below.
+  brk <- bp$breakpoints[1]
+  
+  # 7) Identify the break date
+  break_date <- dts[brk]
+  
+  # 8) Evaluate pre/post intervals and compute the threshold function
+  if (is.null(tresh_int)) {
+    pre_break  <- thresh_fun(ysa[1:(brk - 1)])
+    post_break <- thresh_fun(ysa[(brk + 1):length(ysa)])
+  } else {
+    pre_start  <- max(1, brk - tresh_int)
+    pre_end    <- max(1, brk - 1)
+    post_start <- min(length(ysa), brk + 1)
+    post_end   <- min(length(ysa), brk + tresh_int)
+    
+    pre_break  <- thresh_fun(ysa[pre_start:pre_end])
+    post_break <- thresh_fun(ysa[post_start:post_end])
+  }
+  
+  # 9) Compute break magnitude
+  break_magn <- ((post_break - pre_break) / pre_break) * 100
+  
+  # 10) Decide if the break is "valid" based on date + magnitude thresholds
+  if ((break_date >= thresh_date) && (break_magn <= thresh_change)) {
+    out <- list(
+      method           = "stc",
+      data_type        = ts_name,
+      has_breaks       = TRUE,
+      has_valid_breaks = TRUE,
+      break_magn       = break_magn,
+      breaks_indices   = brk,
+      breaks_dates     = break_date,
+      output_object    = bp,
+      season_adj       = season_adj,
+      call             = match.call()
+    )
+    class(out) <- "ts_breaks_run"
+    return(out)
+  } else {
+    out <- list(
+      method           = "stc",
+      data_type        = ts_name,
+      has_breaks       = TRUE,
+      has_valid_breaks = FALSE,
+      break_magn       = break_magn,
+      breaks_indices   = brk,
+      breaks_dates     = break_date,
+      output_object    = bp,
+      season_adj       = season_adj,
+      call             = match.call()
+    )
+    class(out) <- "ts_breaks_run"
+    return(out)
+  }
+}
+
+ltm_wbs_detect_breaks <- function(spidf,
+                                  ts_name = "spi",
+                                  season_adj = TRUE,
+                                  s_window = 30,
+                                  thresh_date,
+                                  thresh_change = -10,
+                                  tresh_int = NULL,
+                                  thresh_fun = median,
+                                  num_intervals = 1000,
+                                  ...)
+{
+  stopifnot(inherits(spidf, "spidf"))
+  valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
+  if (!(ts_name %in% valid_data_types)) {
+    stop("Invalid ts_name! Must be one of: ", paste(valid_data_types, collapse = ", "))
+  }
+  
+  # Prepare time series
+  yts <- ltm_spidf_to_ts(spidf, ts_name)
+  dts <- ltm_get_dates(spidf, remove_leap = TRUE)
+  
+  # (Optional) Seasonal adjustment
+  if (season_adj) {
+    decomp <- stl(yts, s.window = s_window)
+    ysa <- seasadj(decomp)
+  } else {
+    ysa <- yts
+  }
+  
+  # Fit Wild Binary Segmentation
+  wbs_fit <- wbs::wbs(ysa, numIntervals = num_intervals)
+  cp_fit <- wbs::changepoints(wbs_fit, penalty = "ssic.penalty", ...)  # or "sic", "ssic.penalty", etc.
+  
+  # If no breakpoints
+  if (length(cp_fit$cpt.th) == 0) {
+    out <- list(
+      method           = "wbs",
+      data_type        = ts_name,
+      has_breaks       = FALSE,
+      has_valid_breaks = FALSE,
+      break_magn       = NA,
+      breaks_indices   = NA,
+      breaks_dates     = NA,
+      output_object    = cp_fit,
+      season_adj       = season_adj,
+      call             = match.call()
+    )
+    class(out) <- "ts_breaks_run"
+    return(out)
+  }
+  
+  # cp_fit$cpt.th might be a list of solutions or a numeric vector
+  if (is.list(cp_fit$cpt.th)) {
+    # Extract the first numeric solution
+    brk_vec <- cp_fit$cpt.th[[1]]
+  } else {
+    # Already numeric
+    brk_vec <- cp_fit$cpt.th
+  }
+  
+  # If there's more than one break, we pick the first for single-break logic
+  if (length(brk_vec) == 0) {
+    # If there's truly no breaks in the first solution
+    out <- list(
+      method           = "wbs",
+      data_type        = ts_name,
+      has_breaks       = FALSE,
+      has_valid_breaks = FALSE,
+      break_magn       = NA,
+      breaks_indices   = NA,
+      breaks_dates     = NA,
+      output_object    = cp_fit,
+      season_adj       = season_adj,
+      call             = match.call()
+    )
+    class(out) <- "ts_breaks_run"
+    return(out)
+  }
+  
+  # Take the first numeric index
+  brk <- brk_vec[1]
+  break_date <- dts[brk]
+  
+  # Evaluate pre- and post-break windows
+  if (is.null(tresh_int)) {
+    pre_break  <- thresh_fun(ysa[1:(brk - 1)])
+    post_break <- thresh_fun(ysa[(brk + 1):length(ysa)])
+  } else {
+    pre_start  <- max(1, brk - tresh_int)
+    pre_end    <- max(1, brk - 1)
+    post_start <- min(length(ysa), brk + 1)
+    post_end   <- min(length(ysa), brk + tresh_int)
+    
+    pre_break  <- thresh_fun(ysa[pre_start:pre_end])
+    post_break <- thresh_fun(ysa[post_start:post_end])
+  }
+  
+  break_magn <- ((post_break - pre_break) / pre_break) * 100
+  valid_break <- (break_date >= thresh_date) && (break_magn <= thresh_change)
+  
+  out <- list(
+    method           = "wbs",
+    data_type        = ts_name,
+    has_breaks       = TRUE,
+    has_valid_breaks = valid_break,
+    break_magn       = break_magn,
+    breaks_indices   = brk,
+    breaks_dates     = break_date,
+    output_object    = cp_fit,
+    season_adj       = season_adj,
+    call             = match.call()
+  )
+  class(out) <- "ts_breaks_run"
+  return(out)
+}
 
 
 
