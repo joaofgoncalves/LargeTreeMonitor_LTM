@@ -1,18 +1,16 @@
----
-editor_options: 
-  markdown: 
-    wrap: 72
----
 
-![](www/LTM_logo-v1.png){width="120"}
+![](www/LTM_logo-small-v1.png)
+
 
 # Large Tree Monitoring (LTM)
 
-[Large Tree Monitoring]{.underline} (LTM) is an R-based project designed
+**Large Tree Monitoring]** (LTM) is an R-based project designed
 to monitor large trees using Sentinel-2 satellite imagery and Google
 Earth Engine (GEE). The project offers tools for data acquisition,
 preprocessing, analysis, and visualization to facilitate effective
-monitoring of large tree dynamics over time.
+monitoring of large tree dynamics over time.      
+
+
 
 **Data Acquisition**: Utilizes GEE and rgee to access and download
 Sentinel-2 time series data for specified regions and time frames. As
@@ -58,15 +56,15 @@ Dependencies LTM leverages several R packages, including:
 
 -   ggplot2: Creates data visualizations.
 
-## Installation 
+## Installation
 
 To install the necessary packages, run:
 
-``` R
+``` r
 install.packages(c("rgee", "sf", "terra", "tidyverse", "rgeeExtra", "imputeTS", "bfast", "forecast", "lubridate", "ggplot2")) 
 ```
 
-## Main usage guidelines 
+## Main usage guidelines
 
 -   Google Earth Engine Authentication: Authenticate your GEE account
     using the LTM_gee_auth.R script.
