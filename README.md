@@ -61,7 +61,9 @@ Dependencies LTM leverages several R packages, including:
 To install the necessary packages, run:
 
 ``` r
-install.packages(c("rgee", "sf", "terra", "tidyverse", "rgeeExtra", "imputeTS", "bfast", "forecast", "lubridate", "ggplot2")) 
+install.packages(c("rgee", "sf", "terra", 
+  "tidyverse", "rgeeExtra", "imputeTS", 
+  "bfast", "forecast", "lubridate", "ggplot2")) 
 ```
 
 ## Main usage guidelines
