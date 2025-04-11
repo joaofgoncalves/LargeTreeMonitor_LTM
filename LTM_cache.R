@@ -1,3 +1,5 @@
+
+
 # Function to generate cache file name
 ltm_cache_file_name <- function(lat, lon, start_date, end_date, spi, proc_level) {
   start_date <- format(as.Date(start_date), "%Y-%m-%d")
