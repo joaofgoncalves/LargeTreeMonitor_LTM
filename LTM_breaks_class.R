@@ -24,7 +24,7 @@ ltm_add_runs <- function(ts_breaks_obj, ...) {
   
   run_objects <- list(...)
   
-  valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
+  #valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
   
   for (run_object in run_objects) {
     if (!inherits(run_object, "ts_breaks_run")) {
@@ -40,8 +40,8 @@ ltm_add_runs <- function(ts_breaks_obj, ...) {
       ts_breaks_obj$algorithms[[algorithm_name]] <- list()
     }
     
-    if (!(run_object$data_type %in% valid_data_types)) {
-      stop("Error: 'data_type' must be one of: ", paste(valid_data_types, collapse = ", "))
+    if (!(run_object$data_type %in% VALID_DATA_TYPES)) {
+      stop("Error: 'data_type' must be one of: ", paste(VALID_DATA_TYPES, collapse = ", "))
     }
     
     new_run <- list(
