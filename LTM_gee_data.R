@@ -1,8 +1,6 @@
 
 
-SPECTRAL_INDICES_LIST <<- c("NDVI","EVI")
 
-PROC_LEVELS_LIST <<- c("L1","L1C","L2","L2A")
 
 ltm_get_s2_imgcol <- function(proc_level = "L2A") {
   
