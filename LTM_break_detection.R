@@ -157,132 +157,262 @@ ltm_cpm_detect_breaks <- function(spidf,
   }
 }
 
+# 
+# # Wrapper function for running the bfast01 algo
+# ltm_bfast01_detect_breaks <- function(
+#     spidf,
+#     ts_name = "spi",
+#     formula = response ~ harmon + trend,
+#     s_window   = 30,
+#     test = "OLS-MOSUM",
+#     level = 0.05,
+#     aggregate = all,
+#     trim = NULL,
+#     bandwidth = 0.15,
+#     functional = "max",
+#     order = 3, 
+#     thresh_date,
+#     thresh_change = -10,
+#     tresh_int       = NULL,
+#     thresh_fun = median,
+#     ...){
+#   
+#   
+#   stopifnot(inherits(spidf, "spidf"))
+#   
+#   #valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
+#   
+#   if (!(ts_name %in% VALID_DATA_TYPES)) {
+#     stop("Invalid ts_name! Must be one of: ", paste(VALID_DATA_TYPES, collapse = ", "))
+#   }
+#   
+#   
+#   yts <- ltm_spidf_to_ts(spidf, ts_name)
+#   dts <- ltm_get_dates(spidf, remove_leap=TRUE)
+#   
+#   bf01 <- bfast01(
+#     data = yts,
+#     formula = formula,
+#     test = test,
+#     level = level,
+#     aggregate = aggregate,
+#     trim = trim,
+#     bandwidth = bandwidth,
+#     functional = functional,
+#     order = order, ...)
+#   
+#   
+#   #break_date <- breakdates(bf01)
+#   brk <- bf01$breakpoints
+#   
+#   
+#   if(length(brk) == 0){
+#     
+#     out <- list(method="bfast01",
+#                 data_type = ts_name,
+#                 has_breaks = FALSE,
+#                 has_valid_breaks = FALSE,
+#                 break_magn = NA,
+#                 breaks_indices = NA,
+#                 breaks_dates = NA,
+#                 output_object = bf01,
+#                 #time_series_data = yts,
+#                 season_adj = FALSE,
+#                 call = match.call())
+#     class(out) <- "ts_breaks_run"
+#     
+#     return(out)
+#     
+#   }else{
+#     
+#     
+#     brk <- bf01$breakpoints
+#     break_date <- dts[brk]
+#     fitted_ts <- ltm_copy_ts(yts, values=fitted(bf01))
+#     decomp <- stl(fitted_ts, s.window = s_window)
+#     fitted_ts <- seasadj(decomp)
+#     
+#     if(is.null(tresh_int)){
+#       pre_break  <- thresh_fun(fitted_ts[1:(brk-1)])
+#       post_break <- thresh_fun(fitted_ts[(brk+1):length(fitted_ts)])
+#       
+#     }else{
+#       pre_start <- max(1, brk - tresh_int)
+#       pre_end   <- max(1, brk - 1)
+#       post_start <- min(length(fitted_ts), brk + 1)
+#       post_end   <- min(length(fitted_ts), brk + tresh_int)
+#       
+#       pre_break  <- thresh_fun(fitted_ts[pre_start:pre_end])
+#       post_break <- thresh_fun(fitted_ts[post_start:post_end])
+#     }
+#     
+#     break_magn <- ((post_break - pre_break) / pre_break)*100
+#     
+#     if(
+#       (break_date >= thresh_date) && 
+#       (break_magn <= thresh_change) #&&
+#     ){
+#       
+#       out <- list(method="bfast01",
+#                   data_type = ts_name,
+#                   has_breaks = TRUE,
+#                   has_valid_breaks = TRUE,
+#                   break_magn = break_magn,
+#                   breaks_indices = brk,
+#                   breaks_dates = break_date,
+#                   output_object = bf01,
+#                   #time_series_data = yts,
+#                   season_adj = FALSE,
+#                   call = match.call())
+#       class(out) <- "ts_breaks_run"
+#       return(out)
+#       
+#     }else{
+#       out <- list(method="bfast01",
+#                   data_type = ts_name,
+#                   has_breaks = TRUE,
+#                   has_valid_breaks = FALSE,
+#                   break_magn = break_magn,
+#                   breaks_indices = brk,
+#                   breaks_dates = break_date,
+#                   output_object = bf01,
+#                   #time_series_data = yts,
+#                   season_adj = FALSE,
+#                   call = match.call())
+#       class(out) <- "ts_breaks_run"
+#       return(out)
+#     }
+#   }
+# }
+# 
 
-# Wrapper function for running the bfast01 algo
 ltm_bfast01_detect_breaks <- function(
     spidf,
-    ts_name = "spi",
-    formula = response ~ harmon + trend,
-    s_window   = 30,
-    test = "OLS-MOSUM",
-    level = 0.05,
-    aggregate = all,
-    trim = NULL,
-    bandwidth = 0.15,
-    functional = "max",
-    order = 3, 
+    ts_name       = "spi",
+    formula       = response ~ harmon + trend,
+    s_window      = 30,
+    test          = "OLS-MOSUM",
+    level         = 0.05,
+    aggregate     = all,
+    trim          = NULL,
+    bandwidth     = 0.15,
+    functional    = "max",
+    order         = 3, 
     thresh_date,
     thresh_change = -10,
-    tresh_int       = NULL,
-    thresh_fun = median,
-    ...){
-  
-  
+    tresh_int     = NULL,
+    thresh_fun    = median,
+    ...
+) {
   stopifnot(inherits(spidf, "spidf"))
-  
-  #valid_data_types <- c("spi", "spi_mov_wind", "spi_smooth", "spi_mov_smooth")
-  
   if (!(ts_name %in% VALID_DATA_TYPES)) {
-    stop("Invalid ts_name! Must be one of: ", paste(VALID_DATA_TYPES, collapse = ", "))
+    stop("Invalid ts_name: ", ts_name)
   }
-  
   
   yts <- ltm_spidf_to_ts(spidf, ts_name)
-  dts <- ltm_get_dates(spidf, remove_leap=TRUE)
+  dts <- ltm_get_dates(spidf, remove_leap = TRUE)
   
   bf01 <- bfast01(
-    data = yts,
-    formula = formula,
-    test = test,
-    level = level,
-    aggregate = aggregate,
-    trim = trim,
-    bandwidth = bandwidth,
+    data       = yts,
+    formula    = formula,
+    test       = test,
+    level      = level,
+    aggregate  = aggregate,
+    trim       = trim,
+    bandwidth  = bandwidth,
     functional = functional,
-    order = order, ...)
+    order      = order,
+    ...
+  )
   
-  
-  #break_date <- breakdates(bf01)
+  # Extract breakpoints
   brk <- bf01$breakpoints
   
+  # Check for absence of break
+  if (length(brk) == 0 || is.null(brk) || is.na(brk)) {
+    return(structure(list(
+      method           = "bfast01",
+      data_type        = ts_name,
+      has_breaks       = FALSE,
+      has_valid_breaks = FALSE,
+      break_magn       = NA,
+      breaks_indices   = NA,
+      breaks_dates     = NA,
+      output_object    = bf01,
+      season_adj       = FALSE,
+      call             = match.call()
+    ), class = "ts_breaks_run"))
+  }
   
-  if(is.na(brk)){
+  # Ensure valid index (integer, positive, within bounds)
+  brk <- as.integer(brk[1])
+  
+  if (brk < 2 || brk >= length(yts)) {
+    return(structure(list(
+      method           = "bfast01",
+      data_type        = ts_name,
+      has_breaks       = TRUE,
+      has_valid_breaks = FALSE,
+      break_magn       = NA,
+      breaks_indices   = brk,
+      breaks_dates     = NA,
+      output_object    = bf01,
+      season_adj       = FALSE,
+      call             = match.call()
+    ), class = "ts_breaks_run"))
+  }
+  
+  break_date <- dts[brk]
+  
+  # Season adjustment using STL
+  fitted_ts <- ltm_copy_ts(yts, values = fitted(bf01))
+  decomp    <- stl(fitted_ts, s.window = s_window)
+  fitted_ts <- seasadj(decomp)
+  
+  n <- length(fitted_ts)
+  
+  # Define pre/post break windows
+  if (is.null(tresh_int)) {
+    pre  <- fitted_ts[1:(brk - 1)]
+    post <- fitted_ts[(brk + 1):n]
+  } else {
+    pre_start  <- max(1, brk - tresh_int)
+    pre_end    <- max(1, brk - 1)
+    post_start <- min(n, brk + 1)
+    post_end   <- min(n, brk + tresh_int)
     
-    out <- list(method="bfast01",
-                data_type = ts_name,
-                has_breaks = FALSE,
-                has_valid_breaks = FALSE,
-                break_magn = NA,
-                breaks_indices = NA,
-                breaks_dates = NA,
-                output_object = bf01,
-                #time_series_data = yts,
-                season_adj = FALSE,
-                call = match.call())
-    class(out) <- "ts_breaks_run"
-    
-    return(out)
-    
-  }else{
-    
-    
-    brk <- bf01$breakpoints
-    break_date <- dts[brk]
-    fitted_ts <- ltm_copy_ts(yts, values=fitted(bf01))
-    decomp <- stl(fitted_ts, s.window = s_window)
-    fitted_ts <- seasadj(decomp)
-    
-    if(is.null(tresh_int)){
-      pre_break  <- thresh_fun(fitted_ts[1:(brk-1)])
-      post_break <- thresh_fun(fitted_ts[(brk+1):length(fitted_ts)])
-      
-    }else{
-      pre_start <- max(1, brk - tresh_int)
-      pre_end   <- max(1, brk - 1)
-      post_start <- min(length(fitted_ts), brk + 1)
-      post_end   <- min(length(fitted_ts), brk + tresh_int)
-      
-      pre_break  <- thresh_fun(fitted_ts[pre_start:pre_end])
-      post_break <- thresh_fun(fitted_ts[post_start:post_end])
-    }
-    
-    break_magn <- ((post_break - pre_break) / pre_break)*100
-    
-    if(
-      (break_date >= thresh_date) && 
-      (break_magn <= thresh_change) #&&
-    ){
-      
-      out <- list(method="bfast01",
-                  data_type = ts_name,
-                  has_breaks = TRUE,
-                  has_valid_breaks = TRUE,
-                  break_magn = break_magn,
-                  breaks_indices = brk,
-                  breaks_dates = break_date,
-                  output_object = bf01,
-                  #time_series_data = yts,
-                  season_adj = FALSE,
-                  call = match.call())
-      class(out) <- "ts_breaks_run"
-      return(out)
-      
-    }else{
-      out <- list(method="bfast01",
-                  data_type = ts_name,
-                  has_breaks = TRUE,
-                  has_valid_breaks = FALSE,
-                  break_magn = break_magn,
-                  breaks_indices = brk,
-                  breaks_dates = break_date,
-                  output_object = bf01,
-                  #time_series_data = yts,
-                  season_adj = FALSE,
-                  call = match.call())
-      class(out) <- "ts_breaks_run"
-      return(out)
+    pre  <- fitted_ts[pre_start:pre_end]
+    post <- fitted_ts[post_start:post_end]
+  }
+  
+  # Calculate break magnitude safely
+  break_magn <- NA
+  if (length(pre) > 0 && length(post) > 0) {
+    val_pre  <- thresh_fun(pre)
+    val_post <- thresh_fun(post)
+    if (!is.na(val_pre) && abs(val_pre) > .Machine$double.eps) {
+      break_magn <- ((val_post - val_pre) / val_pre) * 100
     }
   }
+  
+  # Evaluate if it's a "valid" break
+  is_valid <- FALSE
+  if (!is.na(break_date) && !is.na(break_magn)) {
+    is_valid <- (break_date >= thresh_date) && (break_magn <= thresh_change)
+  }
+  
+  structure(list(
+    method           = "bfast01",
+    data_type        = ts_name,
+    has_breaks       = TRUE,
+    has_valid_breaks = is_valid,
+    break_magn       = break_magn,
+    breaks_indices   = brk,
+    breaks_dates     = break_date,
+    output_object    = bf01,
+    season_adj       = FALSE,
+    call             = match.call()
+  ), class = "ts_breaks_run")
 }
 
 
