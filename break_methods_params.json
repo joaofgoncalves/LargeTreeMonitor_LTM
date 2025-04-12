@@ -1,0 +1,36 @@
+{
+  "cpm": {
+    "cpm_method": "Exponential",
+    "ARL0": 500
+  },
+  "ed": {
+    "sig.lvl": 0.05,
+    "R": 1000,
+    "k": 1,
+    "min_size": 30,
+    "alpha": 1
+  },
+  "bfast": {
+    "formula": "response ~ harmon + trend",
+    "test": "OLS-MOSUM",
+    "level": 0.05,
+    "bandwidth": 0.15,
+    "functional": "max",
+    "order": 3
+  },
+  "mcp": {
+    "sample": "both",
+    "n_chains": 3,
+    "n_cores": 3,
+    "n_adapt": 1000,
+    "n_iter": 1500,
+    "downsample": 5
+  },
+  "stc": {
+    "h": 0.15,
+    "breaks": 1
+  },
+  "wbs": {
+    "num_intervals": 1000
+  }
+}
