@@ -1,5 +1,4 @@
 
-
 library(bcp)
 library(bfast)
 library(bitops)
@@ -28,7 +27,6 @@ library(tidyverse)
 library(jsonlite)
 
 
-
 source("LTM_gee_auth.R")
 source("LTM_gee_data.R")
 source("LTM_pre_proc.R")
@@ -40,7 +38,7 @@ source("LTM_cache.R")
 source("LTM_CheckConsts.R")
 
 
-params <- fromJSON("break_methods_params.json")
+params <<- fromJSON("break_methods_params.json")
 
 # Ensure cache directory exists
 if (!dir.exists("ltm_cache")) dir.create("ltm_cache")
@@ -230,14 +228,24 @@ ui <- fluidPage(
         checkboxGroupInput(
           inputId = "break_methods", 
           label   = "Break-Detection Methods",
-          choices = c(
-            "Sequential Change Point Model" = "cpm",
-            "Energy Divisive"               = "ed",
-            "Bfast"                         = "bfast",
-            "Bayesian Change Points Model"  = "mcp",
-            "Structural Changes"            = "stc",
-            "Wild Binary Segmentation"      = "wbs"
+          # choices = c(
+          #   "Sequential Change Point Model" = "cpm",
+          #   "Energy Divisive"               = "ed",
+          #   "Bfast"                         = "bfast",
+          #   "Bayesian Change Points Model"  = "mcp",
+          #   "Structural Changes"            = "stc",
+          #   "Wild Binary Segmentation"      = "wbs"
+          # ),
+          choiceNames = list(
+            HTML("Change Point Model (cpm) <span title='Detects sequential changes using the cpm package'> ℹ️</span>"),
+            HTML("Energy Divisive (ed) <span title='ecp package e.divisive method: clustering-based method'> ℹ️</span>"),
+            HTML("BFAST <span title='Breaks in season-trend using bfast'> ℹ️</span>"),
+            HTML("Bayesian Change Points (mcp) <span title='Bayesian model-based detection using mcp'> ℹ️</span>"),
+            HTML("Structural Changes (stc) <span title='strucchange package for structural breaks'> ℹ️</span>"),
+            HTML("Wild Binary Segmentation (wbs) <span title='Fast segmentation of time series'> ℹ️</span>")
           ),
+          choiceValues = c("cpm", "ed", "bfast", "mcp", "stc", "wbs"),
+          
           selected = NULL
         ),
         
@@ -252,7 +260,15 @@ ui <- fluidPage(
           choices = c("Median","90% percentile"),
           selected = "Median"),
         
-        actionButton("analyze_breaks", "Analyze Breaks")
+        actionButton("analyze_breaks", "Analyze Breaks"),
+        
+        ## Parameter editing
+        hr(),
+        p("⚙️ Configure break detection parameters"),
+        actionButton("edit_params", "Edit detection parameters"),
+        verbatimTextOutput("param_save_status")
+        
+        
       )
     )
   ),
@@ -377,8 +393,6 @@ server <- function(input, output, session) {
         if (is.null(last_loc) || (!identical(current_loc, last_loc))) {
           # Clear break analysis objects & outputs
           breakResults(NULL)
-          # output$break_results_table <- renderTable({ NULL }) ## --> this does errors
-          # output$break_summary_ui    <- renderUI({ NULL })
           output$break_analysis_status <- renderText("")
         }
         
@@ -450,7 +464,8 @@ server <- function(input, output, session) {
     if (!isTRUE(is_regularized(spidf_data()))) {
       shinyalert(
         title = "Action Required",
-        text  = "Please regularize/interpolate the time series before applying the moving window analysis.",
+        text  = "Please regularize/interpolate the time series before 
+        applying the moving window analysis.",
         type  = "error"
       )
       return(NULL)
@@ -518,6 +533,60 @@ server <- function(input, output, session) {
   
   # A reactive to hold the aggregated results (ts_breaks object + data frame)
   breakResults <- reactiveVal(NULL)
+  
+  
+  #################################################
+  
+  observeEvent(input$edit_params, {
+    showModal(modalDialog(
+      title = "Edit break detection parameters (JSON)",
+      size = "l",
+      easyClose = TRUE,
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("save_params", "💾 Save Changes")
+      ),
+      textAreaInput(
+        inputId = "json_editor",
+        label = NULL,
+        value = "",  # initially blank, will update below
+        width = "100%",
+        height = "500px"
+      )
+    ))
+    
+    shinyjs::delay(100, {
+      updateTextAreaInput(
+        session,
+        inputId = "json_editor",
+        value = as.character(toJSON(params, pretty = TRUE, auto_unbox = TRUE))
+      )
+    })
+  })
+  
+  
+  observeEvent(input$save_params, {
+    tryCatch({
+      new_params <- fromJSON(input$json_editor, simplifyVector = TRUE)
+      
+      # Save to file
+      write(toJSON(new_params, pretty = TRUE, auto_unbox = TRUE),
+            file = "break_methods_params.json")
+      
+      # Update the reactive global params (if you want real-time usage)
+      params <<- new_params
+      
+      removeModal()
+      output$param_save_status <- renderText("✅ Parameters saved")
+    }, error = function(e) {
+      output$param_save_status <- renderText(
+        paste("❌ Error parsing JSON:", e$message)
+      )
+    })
+  })
+  
+  #################################################
+  
   
   # ---- Break Analysis Logic ----
   observeEvent(input$analyze_breaks, {
@@ -606,99 +675,6 @@ server <- function(input, output, session) {
       for (tsn in input$ts_names) {
         for (method in input$break_methods) {
           
-          # if (method == "cpm") {
-          #   run_obj <- ltm_cpm_detect_breaks(
-          #     spidf       = spidf_data(),
-          #     season_adj  = season_adj,
-          #     ts_name     = tsn,
-          #     s_window    = s_window,
-          #     cpm_method  = "Exponential",
-          #     ARL0        = 500,
-          #     thresh_date = thresh_date,
-          #     thresh_change = thresh_change,
-          #     tresh_int     = tresh_int,
-          #     thresh_fun    = thresh_fun
-          #   )
-          #   
-          # } else if (method == "ed") {
-          #   run_obj <- ltm_ed_detect_breaks(
-          #     spidf       = spidf_data(),
-          #     ts_name     = tsn,
-          #     season_adj  = season_adj,
-          #     s_window    = s_window,
-          #     sig.lvl     = 0.05,
-          #     R           = 1000,
-          #     k           = 1,
-          #     min_size    = 30,
-          #     alpha       = 1,
-          #     thresh_date = thresh_date,
-          #     thresh_change = thresh_change,
-          #     tresh_int   = tresh_int,
-          #     thresh_fun  = thresh_fun
-          #   )
-          #   
-          # } else if (method == "bfast") {
-          #   run_obj <- ltm_bfast01_detect_breaks(
-          #     spidf       = spidf_data(),
-          #     ts_name     = tsn,
-          #     formula     = response ~ harmon + trend,
-          #     s_window    = s_window,
-          #     test        = "OLS-MOSUM",
-          #     level       = 0.05,
-          #     aggregate   = all,
-          #     trim        = NULL,
-          #     bandwidth   = 0.15,
-          #     functional  = "max",
-          #     order       = 3,
-          #     thresh_date = thresh_date,
-          #     thresh_change = thresh_change,
-          #     tresh_int   = tresh_int,
-          #     thresh_fun  = thresh_fun
-          #   )
-          #   
-          # } else if (method == "mcp") {
-          #   run_obj <- ltm_mcp_detect_breaks(
-          #     spidf         = spidf_data(),
-          #     ts_name       = tsn,
-          #     season_adj    = season_adj,
-          #     s_window      = s_window,
-          #     thresh_change = thresh_change,
-          #     thresh_date   = thresh_date,
-          #     sample        = "both",
-          #     n_chains      = 3,
-          #     n_cores       = 3,
-          #     n_adapt       = 1000,
-          #     n_iter        = 2000,
-          #     downsample    = 5
-          #   )
-          # } 
-          # else if (method == "stc") {
-          #   run_obj <- ltm_strucchange_detect_breaks(
-          #     spidf      = spidf_data(),
-          #     ts_name    = tsn,
-          #     season_adj = season_adj,
-          #     s_window   = s_window,
-          #     h          = 0.15,
-          #     breaks     = 1,
-          #     thresh_date = thresh_date,
-          #     thresh_change = thresh_change,
-          #     tresh_int     = tresh_int,
-          #     thresh_fun    = thresh_fun
-          #   )
-          # }
-          # else if (method == "wbs") {
-          #   run_obj <- ltm_wbs_detect_breaks(
-          #     spidf         = spidf_data(),
-          #     ts_name       = tsn,
-          #     season_adj    = season_adj,
-          #     s_window      = s_window,
-          #     thresh_date   = thresh_date,
-          #     thresh_change = thresh_change,
-          #     tresh_int     = tresh_int,
-          #     thresh_fun    = thresh_fun,
-          #     num_intervals = 1000)
-          # }
-          
           if (method == "cpm") {
             run_obj <- ltm_cpm_detect_breaks(
               spidf         = spidf_data(),
@@ -738,8 +714,8 @@ server <- function(input, output, session) {
               s_window      = s_window,
               test          = params$bfast$test,
               level         = params$bfast$level,
-              aggregate     = get(params$bfast$aggregate),  # Convert string to object, if needed
-              trim          = params$bfast$trim,
+              aggregate     = all,
+              trim          = NULL,
               bandwidth     = params$bfast$bandwidth,
               functional    = params$bfast$functional,
               order         = params$bfast$order,
@@ -748,6 +724,7 @@ server <- function(input, output, session) {
               tresh_int     = tresh_int,
               thresh_fun    = thresh_fun
             )
+ 
             
           } else if (method == "mcp") {
             run_obj <- ltm_mcp_detect_breaks(
