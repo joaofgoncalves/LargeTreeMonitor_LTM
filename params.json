@@ -1,4 +1,13 @@
 {
+  "gee":{
+    "gee_username":"joaofgoncalves"
+  },
+  "tree_list_file": {
+    "tree_locs_file": "GV_2025_list_v20250331-v1.csv",
+    "tree_ids_col": "cid",
+    "lat_col": "lat",
+    "lon_col": "lon"
+  },
   "cpm": {
     "cpm_method": "Exponential",
     "ARL0": 500
