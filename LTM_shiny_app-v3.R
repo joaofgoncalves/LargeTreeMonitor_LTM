@@ -1044,20 +1044,13 @@ server <- function(input, output, session) {
     req(br)  # makes sure breakResults() is not NULL
     df <- br$df_breaks
     
-    # 2) Ensure there's at least one row with `has_valid_breaks == TRUE`
-    #    If not, Shiny will display "No data available" or whatever you define
-    # validate(
-    #   need(any(df$has_valid_breaks == TRUE), "[No valid breaks found. Nothing to plot]")
-    # )
-    
-    # 3) Call the function
+    # 2) Call the function
     
     if(any(df$has_valid_breaks == TRUE)){
       plot_valid_breaks(df)
     }else{
       return(NULL)
     }
-      
   })
   
   
