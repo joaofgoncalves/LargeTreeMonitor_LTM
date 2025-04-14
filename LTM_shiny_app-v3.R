@@ -187,6 +187,10 @@ ui <- fluidPage(
         numericInput("latitude", "Latitude", value = 41.720898),
         numericInput("longitude", "Longitude", value = -8.747039),
         
+        actionButton("choose_coords", "", 
+                     icon = icon("map-location-dot"), 
+                     style = "margin-bottom: 8px;"),
+        
         dateInput("start_date", "Start Date", value = "2015-01-01"),
         dateInput("end_date", "End Date", value = "2024-12-31"),
         selectInput("spi", "Spectral Index", choices = c("NDVI", "EVI")),
@@ -288,6 +292,8 @@ ui <- fluidPage(
     )
   ),
   
+  ## Right-side with analysis results
+  
   div(
     class = "main-panel",
     
@@ -306,6 +312,9 @@ ui <- fluidPage(
         leafletOutput("location_map", height = "500px")  # <-- Leaflet map output
       )
     ),
+    
+    uiOutput("download_data_ui"),  # <- dynamic button only when data is ready
+    
     
     hr(),
     
@@ -342,7 +351,91 @@ server <- function(input, output, session) {
   # A new reactiveVal to store the actual lat/lon used in the last fetch
   selectedCoord <- reactiveVal(NULL)
   
+  
+  ## ------------------------------------------------------------------------ ##
+  #  ---- Coordinate picker with reactive val to update main coordinates ----
+  ## ------------------------------------------------------------------------ ##
+  
+  # Reactive value to store the coordinate chosen in the modal
+  pickedCoords <- reactiveVal(list(lat = NULL, lon = NULL))
+  
+  observeEvent(input$choose_coords, {
+    # Reset the picked coordinates
+    pickedCoords(list(lat = NULL, lon = NULL))
+    
+    # Re-render the leaflet output for the modal to ensure no marker is present
+    output$coord_picker_map <- renderLeaflet({
+      lat <- input$latitude
+      lon <- input$longitude
+      leaflet() %>%
+        addTiles(group = "OpenStreetMap") %>%
+        addProviderTiles("Esri.WorldImagery", group = "Satellite") %>%
+        setView(lng = lon, lat = lat, zoom = 11) %>%
+        addLayersControl(
+          baseGroups = c("OpenStreetMap", "Satellite"),
+          options = layersControlOptions(collapsed = FALSE)
+        )
+    })
+    
+    showModal(modalDialog(
+      title = "Select location",
+      size = "xl",
+      easyClose = TRUE,
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirm_coords", "Confirm selection")
+      ),
+      leafletOutput("coord_picker_map", height = "600px")
+    ))
+  })
+  
+  output$coord_picker_map <- renderLeaflet({
+    lat <- input$latitude
+    lon <- input$longitude
+    
+    leaflet() %>%
+      addTiles(group = "OpenStreetMap") %>%
+      addProviderTiles("Esri.WorldImagery", group = "Satellite") %>%
+      setView(lng = lon, lat = lat, zoom = 13) %>%
+      addLayersControl(
+        baseGroups = c("OpenStreetMap", "Satellite"),
+        options = layersControlOptions(collapsed = FALSE)
+      )
+  })
+  
+  observeEvent(input$coord_picker_map_click, {
+    
+    click <- input$coord_picker_map_click
+    
+    if (!is.null(click)) {
+      
+      pickedCoords(list(lat = click$lat, lon = click$lng))
+      
+      leafletProxy("coord_picker_map") %>%
+        clearMarkers() %>%
+        addMarkers(lng = click$lng, lat = click$lat, popup = "Chosen location")
+    }
+  })
+  
+  observeEvent(input$confirm_coords, {
+    coords <- pickedCoords()
+    
+    if (!is.null(coords$lat) && !is.null(coords$lon)) {
+      
+      updateNumericInput(session, "latitude", value = coords$lat)
+      updateNumericInput(session, "longitude", value = coords$lon)
+      
+      selectedCoord(list(lat = coords$lat, lon = coords$lon))
+    }
+    
+    removeModal()
+  })
+  
+  
+  ## -------------------------------------------------------------- ##
   # ---- Data fetch logic ----
+  ## -------------------------------------------------------------- ##
+  
   observeEvent(input$fetch_data, {
     
     output$loading <- renderUI({
@@ -551,6 +644,34 @@ server <- function(input, output, session) {
     )
   })
   
+  
+  ## Download button for time series data
+  
+  output$download_data_ui <- renderUI({
+    
+    df <- spidf_data()#breakResults()
+    req(df)
+    
+    downloadButton("download_data_csv", "Download time series to CSV")
+  })
+  
+  output$download_data_csv <- downloadHandler(
+    filename = function() {
+      paste0("TimeSeriesData_",format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+    },
+    content = function(file) {
+      # Safely retrieve the breaks data frame
+      df <- spidf_data()#breakResults()
+      req(df)  # Ensure breakResults() is not NULL
+      #df <- br$df_breaks
+      
+      # Write the CSV
+      write.csv(df, file, row.names = FALSE)
+    },
+    contentType = "text/csv"
+  )
+  
+
   # ---- Small Leaflet map showing the selected lat/lon ----
   output$location_map <- renderLeaflet({
     coords <- selectedCoord()
@@ -897,7 +1018,7 @@ server <- function(input, output, session) {
     br <- breakResults()
     req(br)
     
-    downloadButton("download_breaks_csv", "Download table to CSV file")
+    downloadButton("download_breaks_csv", "Download breaks to CSV")
   })
   
   output$download_breaks_csv <- downloadHandler(
