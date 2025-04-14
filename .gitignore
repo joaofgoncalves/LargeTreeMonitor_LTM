@@ -4,6 +4,8 @@
 .Ruserdata
 /_data
 /_old
+/_out
+/_analysis
 test_script.R
 GV_2025_list_v20250331-v1.csv
 GVTreeMon_BreakDetectors-v1.R
