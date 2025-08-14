@@ -162,7 +162,7 @@ ltm_copy_ts <- function(ts_to_copy, values){
 ltm_summarize_break_df <- function(break_df) {
   
   if (nrow(break_df) == 0 || !any(break_df$has_valid_breaks)) {
-    return("🟢 No valid breaks were detected.")
+    return("No valid breaks were detected.")
   }
   
   df_valid <- subset(break_df, has_valid_breaks == TRUE & !is.na(break_date))
@@ -179,7 +179,7 @@ ltm_summarize_break_df <- function(break_df) {
   
   # Format into a human-readable summary string
   summary_text <- paste0(
-    "🔴 Break detection summary:\n",
+    "Break detection summary:\n",
     "-------------------------\n",
     paste(
       apply(summary_list, 1, function(row) {
